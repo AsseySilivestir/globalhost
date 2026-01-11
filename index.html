@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy Gateway Manager & Simulator</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: #1e293b;
+            --bg-input: #334155;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* --- Header --- */
+        header {
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .brand span { color: var(--primary); }
+
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+            padding: 4px 12px;
+            border-radius: 20px;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* --- Main Layout --- */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 350px 1fr 350px; /* Admin | Visualizer | Client */
+            gap: 1px;
+            background-color: var(--border); /* Creates grid lines */
+            overflow: hidden;
+        }
+
+        section {
+            background-color: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 1rem;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* --- Column 1: Admin --- */
+        .admin-controls {
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-main);
+            font-family: monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-primary:hover { background-color: var(--primary-hover); }
+
+        .btn-danger {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+            padding: 4px 8px;
+            font-size: 0.8rem;
+        }
+
+        .user-list {
+            margin-top: 2rem;
+        }
+
+        .user-card {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-creds {
+            background: #000;
+            padding: 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: var(--bg-input);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--success);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* --- Column 2: Visualizer --- */
+        #network-canvas {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            cursor: crosshair;
+        }
+
+        .overlay-stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(4px);
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            font-family: monospace;
+            font-size: 0.8rem;
+            pointer-events: none;
+        }
+
+        /* --- Column 3: Client Simulator --- */
+        .client-app {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .phone-mockup {
+            background-color: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 1.5rem;
+            text-align: center;
+            flex: 0 0 auto;
+        }
+
+        .connection-status {
+            font-size: 3rem;
+            margin: 1rem 0;
+            color: var(--text-muted);
+            transition: color 0.3s;
+        }
+
+        .status-connected { color: var(--success); text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        .status-disconnected { color: var(--danger); }
+
+        .traffic-chart {
+            flex: 1;
+            background-color: var(--bg-panel);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: flex-end;
+            padding: 0 10px;
+            gap: 2px;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background-color: var(--primary);
+            opacity: 0.7;
+            border-top-left-radius: 2px;
+            border-top-right-radius: 2px;
+            transition: height 0.2s;
+            min-height: 2px;
+        }
+
+        .btn-connect {
+            background-color: var(--success);
+            color: white;
+            padding: 1rem;
+            font-size: 1.1rem;
+        }
+        
+        .btn-connect.connected {
+            background-color: var(--danger);
+        }
+
+        .logs-panel {
+            height: 150px;
+            background: #000;
+            border-top: 1px solid var(--border);
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.75rem;
+            overflow-y: auto;
+            color: var(--success);
+        }
+
+        .log-entry { margin-bottom: 4px; }
+        .log-entry .time { color: var(--text-muted); margin-right: 8px; }
+        .log-entry.error { color: var(--danger); }
+
+        /* --- Toast Notification --- */
+        #toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .toast {
+            background: var(--bg-panel);
+            border-left: 4px solid var(--primary);
+            color: var(--text-main);
+            padding: 12px 20px;
+            margin-top: 10px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            animation: slideIn 0.3s ease-out forwards;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: 1fr 1fr;
+            }
+            section:nth-child(3) { grid-column: 1 / -1; }
+        }
+        @media (max-width: 768px) {
+            main {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(3, 1fr);
+                overflow-y: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/>
+                <path d="M2 12h20"/>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+            </svg>
+            <span>Splannes-Proxy</span>Gateway
+        </div>
+        <div class="server-status">
+            <div class="status-dot"></div>
+            VPS- Online: 198.51.100.22
+        </div>
+    </header>
+
+    <main>
+        <!-- ADMIN PANEL -->
+        <section>
+            <div class="panel-header">
+                Admin cPanel
+                <span style="font-size:0.8rem; color:var(--text-muted)">Node.js API Mock</span>
+            </div>
+            <div class="admin-controls">
+                <div class="form-group">
+                    <label>Create New Proxy Credentials</label>
+                    <input type="text" id="usernameInput" placeholder="Username (e.g. client_android)" value="user_alice">
+                </div>
+                <div class="form-group">
+                    <label>Data Quota (MB)</label>
+                    <input type="number" id="quotaInput" value="1024">
+                </div>
+                <button class="btn-primary" onclick="app.createUser()">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    Generate Credentials here
+                </button>
+
+                <div class="user-list" id="userList">
+                    <!-- Users injected here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- NETWORK VISUALIZER -->
+        <section>
+            <div class="overlay-stats">
+                <div>LIVE TRAFFIC MONITOR</div>
+                <div id="packet-count">Packets: 0</div>
+                <div id="active-connections">Active: 0</div>
+            </div>
+            <canvas id="network-canvas"></canvas>
+        </section>
+
+        <!-- CLIENT SIMULATOR -->
+        <section>
+            <div class="panel-header">
+                Client Simulator
+                <span style="font-size:0.8rem; color:var(--text-muted)">Android Java Mock</span>
+            </div>
+            <div class="client-app">
+                <div class="phone-mockup">
+                    <h3>VPN/Proxy App</h3>
+                    <div class="connection-status" id="connectionIcon">
+                        &#10006; <!-- X icon -->
+                    </div>
+                    <div id="currentConfig" style="margin-bottom:1rem; font-size:0.9rem; color:var(--text-muted)">
+                        No Profile Selected
+                    </div>
+                    <button id="connectBtn" class="btn-connect" onclick="app.toggleConnection()">CONNECT</button>
+                </div>
+
+                <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                    <label style="padding: 0 1rem;">Live Throughput (KB/s)</label>
+                    <div class="traffic-chart" id="trafficChart">
+                        <!-- Bars injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="logs-panel" id="logs">
+        <!-- Logs go here -->
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script>
+        /**
+         * PROXY GATEWAY SIMULATOR
+         * 
+         * This script mocks the behavior of the Node.js Backend and the Android Client.
+         * It manages user state, simulates network traffic on a canvas, and updates UI.
+         */
+
+        // --- Utilities ---
+        const $ = (id) => document.getElementById(id);
+        const randomId = () => Math.random().toString(36).substr(2, 6);
+        const formatBytes = (bytes) => (bytes / 1024 / 1024).toFixed(2) + ' MB';
+
+        function showToast(message, type = 'info') {
+            const container = $('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.style.borderLeftColor = type === 'error' ? 'var(--danger)' : 'var(--primary)';
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function log(msg, type = 'info') {
+            const panel = $('logs');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString('en-US', {hour12: false});
+            entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
+            panel.appendChild(entry);
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // --- Mock Backend Data ---
+        class BackendSystem {
+            constructor() {
+                this.users = [];
+                this.activeConnections = 0;
+                // Add a default user for immediate testing
+                this.addUser('user_alice', 1024);
+            }
+
+            addUser(username, quotaMB) {
+                const password = randomId();
+                const user = {
+                    id: randomId(),
+                    username,
+                    password,
+                    quotaLimit: quotaMB * 1024 * 1024, // Convert to bytes
+                    usedBytes: 0,
+                    status: 'offline'
+                };
+                this.users.push(user);
+                return user;
+            }
+
+            getUser(username) {
+                return this.users.find(u => u.username === username);
+            }
+
+            removeUser(id) {
+                this.users = this.users.filter(u => u.id !== id);
+            }
+
+            recordUsage(username, bytes) {
+                const user = this.getUser(username);
+                if (user) {
+                    user.usedBytes += bytes;
+                    if (user.usedBytes >= user.quotaLimit) {
+                        return false; // Quota exceeded
+                    }
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // --- Canvas Visualizer (2D Tool) ---
+        class NetworkVisualizer {
+            constructor(canvasId) {
+                this.canvas = $(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.packets = [];
+                this.nodes = {};
+                this.resize();
+                
+                window.addEventListener('resize', () => this.resize());
+                this.animate();
+            }
+
+            resize() {
+                this.canvas.width = this.canvas.offsetWidth;
+                this.canvas.height = this.canvas.offsetHeight;
+                this.defineNodes();
+            }
+
+            defineNodes() {
+                const w = this.canvas.width;
+                const h = this.canvas.height;
+                this.nodes = {
+                    client: { x: w * 0.15, y: h * 0.5, label: 'Android\nClient', color: '#3b82f6' },
+                    vps: { x: w * 0.5, y: h * 0.5, label: 'VPS Proxy\n(1080)', color: '#06b6d4' },
+                    internet: { x: w * 0.85, y: h * 0.5, label: 'Internet', color: '#10b981' }
+                };
+            }
+
+            spawnPacket(direction) {
+                if (app.state.connected) {
+                    this.packets.push({
+                        x: this.nodes.client.x,
+                        y: this.nodes.client.y,
+                        target: this.nodes.internet,
+                        speed: 4 + Math.random() * 2,
+                        progress: 0
+                    });
+                }
+            }
+
+            drawNode(node) {
+                const ctx = this.ctx;
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, 30, 0, Math.PI * 2);
+                ctx.fillStyle = app.state.connected ? node.color : '#334155';
+                ctx.fill();
+                ctx.strokeStyle = node.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Icon/Text
+                ctx.fillStyle = '#fff';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(node.label.split('\n')[0], node.x, node.y);
+                ctx.font = '8px sans-serif';
+                ctx.fillText(node.label.split('\n')[1] || '', node.x, node.y + 12);
+            }
+
+            drawConnection(n1, n2) {
+                const ctx = this.ctx;
+                ctx.beginPath();
+                ctx.moveTo(n1.x, n1.y);
+                ctx.lineTo(n2.x, n2.y);
+                ctx.strokeStyle = app.state.connected ? '#475569' : '#1e293b';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            animate() {
+                const ctx = this.ctx;
+                ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw Connections
+                this.drawConnection(this.nodes.client, this.nodes.vps);
+                this.drawConnection(this.nodes.vps, this.nodes.internet);
+
+                // Draw Nodes
+                this.drawNode(this.nodes.client);
+                this.drawNode(this.nodes.vps);
+                this.drawNode(this.nodes.internet);
+
+                // Draw Packets
+                if (app.state.connected) {
+                    this.spawnPacket();
+                    
+                    // Update stats
+                    $('packet-count').innerText = `Packets: ${Math.floor(Math.random() * 500 + 100)}`;
+                }
+
+                for (let i = this.packets.length - 1; i >= 0; i--) {
+                    let p = this.packets[i];
+                    let totalDist = this.nodes.internet.x - this.nodes.client.x;
+                    p.x += p.speed;
+                    
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fff';
+                    ctx.fill();
+
+                    // Animate Y slightly for organic look
+                    p.y = this.nodes.client.y + Math.sin(p.x / 50) * 5;
+
+                    if (p.x > this.nodes.internet.x) {
+                        this.packets.splice(i, 1);
+                    }
+                }
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // --- Chart Manager ---
+        class TrafficChart {
+            constructor(elementId) {
+                this.container = $(elementId);
+                this.barCount = 40;
+                this.bars = [];
+                this.init();
+            }
+
+            init() {
+                for (let i = 0; i < this.barCount; i++) {
+                    const bar = document.createElement('div');
+                    bar.className = 'chart-bar';
+                    bar.style.height = '5%';
+                    this.container.appendChild(bar);
+                    this.bars.push(bar);
+                }
+            }
+
+            update(isConnected) {
+                // Shift values
+                const val = isConnected ? Math.random() * 90 + 10 : 2;
+                
+                for (let i = 0; i < this.bars.length - 1; i++) {
+                    this.bars[i].style.height = this.bars[i+1].style.height;
+                }
+                this.bars[this.bars.length - 1].style.height = `${val}%`;
+                
+                // Color logic based on intensity
+                this.bars[this.bars.length - 1].style.backgroundColor = val > 80 ? '#06b6d4' : '#3b82f6';
+            }
+        }
+
+        // --- Main Application Logic ---
+        const app = {
+            backend: new BackendSystem(),
+            visualizer: null,
+            chart: null,
+            selectedUser: null,
+            state: {
+                connected: false,
+                interval: null
+            },
+
+            init() {
+                this.visualizer = new NetworkVisualizer('network-canvas');
+                this.chart = new TrafficChart('trafficChart');
+                this.renderUsers();
+                
+                // Simulation Loop for Chart & Usage
+                setInterval(() => {
+                    this.chart.update(this.state.connected);
+                    $('active-connections').innerText = `Active: ${this.state.connected ? 1 : 0}`;
+                    
+                    if (this.state.connected && this.selectedUser) {
+                        // Simulate data usage
+                        const usage = Math.floor(Math.random() * 500 * 1024); // Random bytes
+                        const allowed = this.backend.recordUsage(this.selectedUser.username, usage);
+                        
+                        if (allowed) {
+                            this.updateUserDisplay();
+                        } else {
+                            this.disconnect();
+                            showToast('Data Quota Exceeded!', 'error');
+                            log(`User ${this.selectedUser.username} exceeded quota. Disconnecting.`, 'error');
+                        }
+                    }
+                }, 500);
+
+                log('System initialized. VPS Proxy Service listening on port 1080 (SOCKS5).');
+            },
+
+            createUser() {
+                const name = $('usernameInput').value;
+                const quota = $('quotaInput').value;
+                if (!name || !quota) return showToast('Please fill in all fields', 'error');
+
+                const user = this.backend.addUser(name, quota);
+                this.renderUsers();
+                showToast(`Credentials generated for ${name}`);
+                log(`Created new user: ${name} / ${user.password}`);
+            },
+
+            deleteUser(id) {
+                this.backend.removeUser(id);
+                if (this.selectedUser && this.selectedUser.id === id) {
+                    this.selectedUser = null;
+                    $('currentConfig').innerText = 'No Profile Selected';
+                    if (this.state.connected) this.disconnect();
+                }
+                this.renderUsers();
+            },
+
+            selectUser(id) {
+                this.selectedUser = this.backend.users.find(u => u.id === id);
+                // Update Client Simulator UI
+                const config = `
+                    <strong>HOST:</strong> 198.51.100.22<br>
+                    <strong>PORT:</strong> 1080<br>
+                    <strong>USER:</strong> ${this.selectedUser.username}<br>
+                    <strong>PASS:</strong> ${this.selectedUser.password}
+                `;
+                $('currentConfig').innerHTML = config;
+                showToast('Profile loaded into Client Simulator');
+            },
+
+            renderUsers() {
+                const list = $('userList');
+                list.innerHTML = '';
+                this.backend.users.forEach(user => {
+                    const percent = (user.usedBytes / user.quotaLimit) * 100;
+                    
+                    const card = document.createElement('div');
+                    card.className = 'user-card';
+                    card.innerHTML = `
+                        <div class="user-header">
+                            <strong>${user.username}</strong>
+                            <button class="btn-danger" onclick="event.stopPropagation(); app.deleteUser('${user.id}')">DEL</button>
+                        </div>
+                        <div class="user-creds" onclick="app.selectUser('${user.id}')" style="cursor:pointer">
+                            <span>Pass: ${user.password}</span>
+                            <span style="font-size:1.2rem; cursor:pointer;">&#128279;</span>
+                        </div>
+                        <div style="font-size:0.8rem; display:flex; justify-content:space-between">
+                            <span>${formatBytes(user.usedBytes)} / ${formatBytes(user.quotaLimit)}</span>
+                            <span>${Math.round(percent)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${percent}%; background-color: ${percent > 90 ? 'var(--danger)' : 'var(--success)'}"></div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            },
+
+            updateUserDisplay() {
+                // Just re-render list to update progress bars efficiently
+                this.renderUsers();
+            },
+
+            toggleConnection() {
+                if (this.state.connected) {
+                    this.disconnect();
+                } else {
+                    this.connect();
+                }
+            },
+
+            connect() {
+                if (!this.selectedUser) {
+                    showToast('Please select a user profile from the Admin panel', 'error');
+                    return;
+                }
+                
+                // Simulate Connection Delay
+                const btn = $('connectBtn');
+                btn.innerText = 'HANDSHAKING...';
+                
+                setTimeout(() => {
+                    this.state.connected = true;
+                    btn.innerText = 'DISCONNECT';
+                    btn.classList.add('connected');
+                    $('connectionIcon').innerHTML = '&#10004;'; // Checkmark
+                    $('connectionIcon').classList.remove('status-disconnected');
+                    $('connectionIcon').classList.add('status-connected');
+                    
+                    log(`CONNECTED: ${this.selectedUser.username} -> VPS (SOCKS5)`, 'success');
+                    showToast('Connection Established');
+                }, 800);
+            },
+
+            disconnect() {
+                this.state.connected = false;
+                const btn = $('connectBtn');
+                btn.innerText = 'CONNECT';
+                btn.classList.remove('connected');
+                $('connectionIcon').innerHTML = '&#10006;'; // X
+                $('connectionIcon').classList.remove('status-connected');
+                $('connectionIcon').classList.add('status-disconnected');
+                
+                if(this.selectedUser) {
+                    log(`DISCONNECTED: ${this.selectedUser.username}`);
+                }
+            }
+        };
+
+        // Start App
+        window.addEventListener('DOMContentLoaded', () => app.init());
+
+    </script>
+</body>
+</html>
